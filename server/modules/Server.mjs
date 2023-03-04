@@ -4,6 +4,7 @@ import {RoomManager} from "./RoomManager.mjs";
 import {SocketMessage} from "../../src/modules/SocketMessage.mjs";
 import {Alert} from "../../src/modules/objects/Alert.mjs";
 import {GameManager} from "./GameManager.mjs";
+import {Config} from "../../config/config.mjs";
 
 export class Server {
     websocketServer;
@@ -14,7 +15,8 @@ export class Server {
 
     constructor() {
         this.clientManager = new ClientManager();
-        this.websocketServer = new WebSocketServer({ port: 8080 });
+        this.websocketServer = new WebSocketServer({ port: Config.port });
+        console.log(this.websocketServer.address());
         this.roomManager = new RoomManager();
         this.gameManager = new GameManager(this);
     }
@@ -28,6 +30,8 @@ export class Server {
 
     createSocketListener() {
         this.websocketServer.on('connection', function connection(ws, req) {
+            const clientIpAddress = req.connection.remoteAddress;
+            console.log(`New WebSocket connection from IP address: ${clientIpAddress}`);
             ws.on('message', function message(data) {
                 let message = SocketMessage.read(data);
                 switch (message.type) {

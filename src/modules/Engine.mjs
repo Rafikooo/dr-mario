@@ -4,6 +4,7 @@ import {SocketMessage} from "./SocketMessage.mjs";
 import {Alert} from "./objects/Alert.mjs";
 import {StaticText} from "./objects/StaticText.mjs";
 import {Color} from "./Color.mjs";
+import {Config} from "../../config/config.mjs";
 
 export class Engine {
     canvas;
@@ -40,11 +41,12 @@ export class Engine {
         this.playerPoints = [];
         this.room = null;
 
-        this.serverIp = localStorage.getItem('serverIp') ?? null;
+        this.serverIp = localStorage.getItem('serverIp') ?? Config.address ?? null;
         this.roomInfo = new StaticText(10, 50, 100, 10, `Press P to connect to server`, Color.GREEN)
         this.serverInfo = new StaticText(100, 25, 100, 10, `Server: ${this.serverIp}`, Color.GREEN);
 
         if (this.serverIp) {
+            console.log(this.serverIp);
             this.setupSocketListener();
             this.roomInfo = new StaticText(10, 50, 100, 10, `Connected to ${this.serverIp}`, Color.GREEN)
             this.serverInfo.text = `Server: ${this.serverIp}`
@@ -115,7 +117,8 @@ export class Engine {
         if (forcePrompt === true) {
             this.serverIp = null;
         }
-        this.ws = new WebSocket(`ws://${this.getServerIp()}`);
+        // this.ws = new WebSocket(`ws://${this.getServerIp()}`);
+        this.ws = new WebSocket(Config.address);
         this.ws.onerror = event => {
             this.addObject(new Alert(`could not connect to server`, Alert.TYPE_ERROR, this));
             this.room = null;
