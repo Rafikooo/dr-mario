@@ -136,6 +136,10 @@ export class Engine {
             const message = SocketMessage.read(event.data);
 
             switch (message.type) {
+                case SocketMessage.TYPE_GAME_READY:
+                    this.gameState = GameState.READY_TO_START;
+
+                    break;
                 case SocketMessage.TYPE_GAME_START:
                     this.gameState = GameState.PLAYING;
 
@@ -410,7 +414,7 @@ export class Engine {
         const roomName = prompt('Enter name of room:');
 
         if (roomName.length >= 3) {
-            this.ws.send(SocketMessage.send(SocketMessage.TYPE_CREATE_ROOM, {name: roomName}, this.client));
+            this.ws.send(SocketMessage.send(SocketMessage.TYPE_CREATE_OR_JOIN_ROOM, {name: roomName}, this.client));
         } else {
             alert('name must be longer than 3');
         }

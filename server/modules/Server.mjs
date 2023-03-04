@@ -29,38 +29,50 @@ export class Server {
     }
 
     createSocketListener() {
-        let clientMessage;
         this.websocketServer.on('connection', function connection(ws, req) {
             const clientIpAddress = req.connection.remoteAddress;
             console.log(`New WebSocket connection from IP address: ${clientIpAddress}`);
             ws.on('message', function message(data) {
                 let message = SocketMessage.read(data);
                 switch (message.type) {
-                    case SocketMessage.TYPE_GAME_START:
-
-                        break;
                     case SocketMessage.TYPE_CONNECTION:
-
                         break;
 
                     case SocketMessage.TYPE_PLAYER_KEY:
                         this.handleKeyPressed(message);
+
                         break;
+
                     case SocketMessage.TYPE_OUT_OF_PILLS:
                         this.gameManager.emitPills(message);
+
                         break;
-                    case SocketMessage.TYPE_CREATE_ROOM:
+
+                    case SocketMessage.TYPE_CREATE_OR_JOIN_ROOM:
                         this.connectToRoom(message);
+                        this.dispatchRoomState(message);
+
                         break;
+
+                    case SocketMessage.TYPE_GAME_START:
+                        this.dispatchGameStart(message);
+
+                        break;
+
                     case SocketMessage.TYPE_POINTS_UPDATED:
                         this.handlePointsUpdated(message);
+
                         break;
+
                     case SocketMessage.TYPE_GAME_OVER:
                         this.handleGameOver(message);
+
                         break;
+
                     case SocketMessage.TYPE_PING:
                         this.clientManager.handlePing(message);
-                    break;
+
+                        break;
                 }
             }.bind(this));
 
@@ -144,6 +156,7 @@ export class Server {
             client.send(SocketMessage.send(SocketMessage.TYPE_ALERT, {
                 text: `joined room named ${roomName}`,
                 type: Alert.TYPE_SUCCESS,
+                data: 'Some data',
             }, client.id));
         }
 
@@ -154,23 +167,49 @@ export class Server {
             player: room.clients.length,
         }, client.id));
 
-        if (room.isRoomFull()) {
-            this.gameManager.startGame(room);
+        console.log('Room list', this.roomManager.rooms);
+    }
 
-            room.emitToClients(SocketMessage.TYPE_POINTS_UPDATED, {
+    dispatchRoomState(message) {
+        const roomName = message.data.name;
+        let room = this.roomManager.getRoomByName(roomName);
+
+        if (room.isReadyToStart()) {
+            room.emitToClients(SocketMessage.TYPE_GAME_READY, {
                 players: [
                     {
                         id: room.clients[0].id,
                         points: room.getPointsForClient(room.clients[0].id),
+                        playerName: room.clients[0].playerName,
                     },
                     {
                         id: room.clients[1].id,
                         points: room.getPointsForClient(room.clients[1].id),
+                        playerName: room.clients[1].playerName,
                     }
                 ]
             })
         }
+    }
 
-        console.log('Room list', this.roomManager.rooms);
+    dispatchGameStart(message) {
+        const roomName = message.data.name;
+
+        let room = this.roomManager.getRoomByName(roomName);
+
+        this.gameManager.startGame(room);
+
+        room.emitToClients(SocketMessage.TYPE_POINTS_UPDATED, {
+            players: [
+                {
+                    id: room.clients[0].id,
+                    points: room.getPointsForClient(room.clients[0].id),
+                },
+                {
+                    id: room.clients[1].id,
+                    points: room.getPointsForClient(room.clients[1].id),
+                }
+            ]
+        })
     }
 }

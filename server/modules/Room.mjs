@@ -1,5 +1,6 @@
 import {SocketMessage} from "../../src/modules/SocketMessage.mjs";
 import {Options} from "../../src/modules/Options.mjs";
+import {RoomState} from "./RoomState.js";
 
 export class Room {
     clients;
@@ -9,6 +10,7 @@ export class Room {
     points;
     finished;
     interval;
+    roomState;
 
     constructor(id, name) {
         this.id = id;
@@ -19,6 +21,7 @@ export class Room {
         this.lastMessage = [];
         this.finished = false;
         this.interval = null;
+        this.roomState = RoomState.EMPTY;
     }
 
     addClient(client) {
@@ -32,6 +35,12 @@ export class Room {
             client: client.id,
             points: 0,
         });
+
+        if (this.clients.length === 1) {
+            this.roomState = RoomState.WAITING_FOR_OPPONENT;
+        } else {
+            this.roomState = RoomState.READY;
+        }
     }
 
     startGame(pills) {
@@ -115,5 +124,9 @@ export class Room {
 
     getClients() {
         return this.clients;
+    }
+
+    isReadyToStart() {
+        return this.roomState === RoomState.READY;
     }
 }
