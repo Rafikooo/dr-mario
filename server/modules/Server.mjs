@@ -29,6 +29,7 @@ export class Server {
     }
 
     createSocketListener() {
+        let clientMessage;
         this.websocketServer.on('connection', function connection(ws, req) {
             const clientIpAddress = req.connection.remoteAddress;
             console.log(`New WebSocket connection from IP address: ${clientIpAddress}`);
@@ -169,5 +170,7 @@ export class Server {
                 ]
             })
         }
+
+        console.log('Room list', this.roomManager.rooms);
     }
 }

@@ -5,6 +5,7 @@ import {Alert} from "./objects/Alert.mjs";
 import {StaticText} from "./objects/StaticText.mjs";
 import {Color} from "./Color.mjs";
 import {Config} from "../../config/config.mjs";
+import {GameState} from "./GameState.mjs";
 
 export class Engine {
     canvas;
@@ -40,10 +41,12 @@ export class Engine {
         this.playerInfo = [];
         this.playerPoints = [];
         this.room = null;
+        this.gameState = GameState.WAITING_FOR_OPPONENT;
 
         this.serverIp = localStorage.getItem('serverIp') ?? Config.address ?? null;
-        this.roomInfo = new StaticText(10, 50, 100, 10, `Press P to connect to server`, Color.GREEN)
         this.serverInfo = new StaticText(100, 25, 100, 10, `Server: ${this.serverIp}`, Color.GREEN);
+        this.gameState = new StaticText(10, 75, 100, 10, `Game state: ${this.gameState}`, Color.GREEN);
+        this.roomInfo = new StaticText(10, 75, 100, 10, `Press P to connect to server`, Color.GREEN)
 
         if (this.serverIp) {
             console.log(this.serverIp);
@@ -54,6 +57,7 @@ export class Engine {
 
         this.addObject(this.roomInfo);
         this.addObject(this.serverInfo);
+        this.addObject(this.gameState);
     }
 
     addGrid(grid) {
@@ -77,8 +81,10 @@ export class Engine {
         ];
     }
 
-    clientConnected(client) {
-        this.client = client;
+    clientConnected(clientUuid) {
+        console.log('client connected', clientUuid);
+        this.client = clientUuid;
+        localStorage.setItem('uuid', clientUuid);
         this.pingInterval = setInterval(() => {
             try {
                 this.ws.send(SocketMessage.send(SocketMessage.TYPE_PING, {}, this.client));
@@ -90,41 +96,21 @@ export class Engine {
         }, 2000);
     }
 
-    getIpFromClient() {
-        const ip = prompt('Enter Server IP: ');
-
-        if (!ip) return this.serverIp;
-
-        if (ip.length < 5) {
-            alert('Enter minimum 5 characters');
-            return this.getIpFromClient();
-        }
-
-        this.serverIp = ip;
-
-        return this.serverIp;
-    }
-
-    getServerIp() {
-        if (this.serverIp) {
-            return this.serverIp;
-        }
-
-        return this.getIpFromClient();
-    }
-
     setupSocketListener(forcePrompt = false) {
         if (forcePrompt === true) {
             this.serverIp = null;
         }
         // this.ws = new WebSocket(`ws://${this.getServerIp()}`);
-        this.ws = new WebSocket(Config.address);
+        const uuid = localStorage.getItem('uuid') ?? null;
+        const playerName = localStorage.getItem('playerName') ?? prompt('Enter your name: ');
+        localStorage.setItem('playerName', playerName);
+        this.ws = new WebSocket(Config.address + `?uuid=${uuid}?playerName=${playerName}`);
         this.ws.onerror = event => {
             this.addObject(new Alert(`could not connect to server`, Alert.TYPE_ERROR, this));
             this.room = null;
             this.client = null;
             this.roomInfo.text = `Press P to connect to server`;
-            this.serverInfo.text = `Server: None`
+            this.serverInfo.text = `Server: unavailable`
             localStorage.removeItem('serverIp');
         }
 
@@ -137,11 +123,11 @@ export class Engine {
         }
 
         this.ws.onclose = event => {
-            this.addObject(new Alert(`Disconnected from server!`, Alert.TYPE_ERROR, this));
+            // this.addObject(new Alert(`Disconnected from server!`, Alert.TYPE_ERROR, this));
             this.room = null;
             this.client = null;
             this.roomInfo.text = `Press P to connect to server`;
-            this.serverInfo.text = `Server: None`
+            this.serverInfo.text = `Server: unavailable, connection closed`
             localStorage.removeItem('serverIp');
 
         }
@@ -151,6 +137,8 @@ export class Engine {
 
             switch (message.type) {
                 case SocketMessage.TYPE_GAME_START:
+                    this.gameState = GameState.PLAYING;
+
                     this.grids.forEach(grid => {
                         grid.addPill();
                     });
@@ -204,8 +192,9 @@ export class Engine {
                 case SocketMessage.TYPE_JOINED_ROOM:
                     this.roomInfo.text = `Room: ${message.data.roomName}`;
                     this.room = message.data.roomName;
-                    this.playerInfo[0].text = `Player1 ${message.data.player === 1 ? '(You)' : ''}`;
-                    this.playerInfo[1].text = `Player2 ${message.data.player === 2 ? '(You)' : ''}`;
+                    let playerName = localStorage.getItem('playerName');
+                    this.playerInfo[0].text = message.data.player === 1 ? playerName : 'Opponent';
+                    this.playerInfo[1].text = message.data.player === 2 ? playerName : 'Opponent';
 
                     this.addObject(this.playerInfo[0]);
                     this.addObject(this.playerInfo[1]);
@@ -224,6 +213,8 @@ export class Engine {
 
                     break;
                 case SocketMessage.TYPE_GAME_OVER:
+                    this.gameState = GameState.READY_TO_START;
+
                     this.grids.forEach(grid => {
                         grid.restart();
                     });
@@ -231,6 +222,7 @@ export class Engine {
                     this.addObject(new Alert('GAME OVER', Alert.TYPE_INFO, this));
 
                     this.roomInfo.text = `Press L to join or create a room!`;
+                    this.roomInfo.xd = `Press xd to join or create a room!`;
 
                     this.removeObject(this.playerInfo[0].id);
                     this.removeObject(this.playerInfo[1].id);
@@ -240,6 +232,12 @@ export class Engine {
                     break;
             }
         }
+    }
+    generateUuid() {
+        return 'xxxxxxxx'.replace(/[xy]/g, function(c) {
+            let r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
 
     fpsLoop(){
