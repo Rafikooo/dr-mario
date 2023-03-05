@@ -19,7 +19,7 @@ export class Room {
         this.name = name;
         this.points = [];
         this.lastMessage = [];
-        this.finished = false;
+        // this.finished = false;
         this.interval = null;
         this.roomState = RoomState.EMPTY;
     }
@@ -117,9 +117,9 @@ export class Room {
 
         clearInterval(this.interval);
         this.lastMessage = [];
-        this.clients = [];
-        this.name = '';
-        this.finished = true;
+        // this.clients = [];
+        // this.name = '';
+        // this.finished = true;
     }
 
     getClients() {

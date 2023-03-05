@@ -135,14 +135,14 @@ export class Server {
 
 
         } else {
-            if (room.finished === true) {
-                client.send(SocketMessage.send(SocketMessage.TYPE_ALERT, {
-                    text: `Room ${roomName} is already finished`,
-                    type: Alert.TYPE_ERROR,
-                }, client.id));
-
-                return;
-            }
+            // if (room.finished === true) {
+            //     client.send(SocketMessage.send(SocketMessage.TYPE_ALERT, {
+            //         text: `Room ${roomName} is already finished`,
+            //         type: Alert.TYPE_ERROR,
+            //     }, client.id));
+            //
+            //     return;
+            // }
 
             if (room.isRoomFull()) {
                 client.send(SocketMessage.send(SocketMessage.TYPE_ALERT, {
@@ -193,9 +193,13 @@ export class Server {
     }
 
     dispatchGameStart(message) {
-        const roomName = message.data.name;
+        const player = this.clientManager.getClientById(message.client);
+        let room = this.roomManager.getRoomByPlayerUuid(player.id);
 
-        let room = this.roomManager.getRoomByName(roomName);
+        // if (room === null !room.isReadyToStart()) {
+        if (!room || !room.isReadyToStart()) {
+            return;
+        }
 
         this.gameManager.startGame(room);
 

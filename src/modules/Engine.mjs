@@ -19,7 +19,7 @@ export class Engine {
     onRunCallback;
     ws;
     client;
-    serverIp;
+    serverName;
 
     constructor(canvas) {
         this.canvas = canvas;
@@ -43,21 +43,21 @@ export class Engine {
         this.room = null;
         this.gameState = GameState.WAITING_FOR_OPPONENT;
 
-        this.serverIp = localStorage.getItem('serverIp') ?? Config.address ?? null;
-        this.serverInfo = new StaticText(100, 25, 100, 10, `Server: ${this.serverIp}`, Color.GREEN);
-        this.gameState = new StaticText(10, 75, 100, 10, `Game state: ${this.gameState}`, Color.GREEN);
+        this.serverName = localStorage.getItem('serverName') ?? Config.address ?? null;
+        this.serverInfo = new StaticText(100, 25, 100, 10, `Server: ${this.serverName}`, Color.GREEN);
+        this.gameStateInfo = new StaticText(10, 75, 100, 10, `Game state: ${this.gameState}`, Color.GREEN);
         this.roomInfo = new StaticText(10, 75, 100, 10, `Press P to connect to server`, Color.GREEN)
 
-        if (this.serverIp) {
-            console.log(this.serverIp);
+        if (this.serverName) {
+            console.log(this.serverName);
             this.setupSocketListener();
-            this.roomInfo = new StaticText(10, 50, 100, 10, `Connected to ${this.serverIp}`, Color.GREEN)
-            this.serverInfo.text = `Server: ${this.serverIp}`
+            this.roomInfo = new StaticText(10, 50, 100, 10, `Connected to ${this.serverName}`, Color.GREEN)
+            this.serverInfo.text = `Server: ${this.serverName}`
         }
 
         this.addObject(this.roomInfo);
         this.addObject(this.serverInfo);
-        this.addObject(this.gameState);
+        this.addObject(this.gameStateInfo);
     }
 
     addGrid(grid) {
@@ -98,12 +98,13 @@ export class Engine {
 
     setupSocketListener(forcePrompt = false) {
         if (forcePrompt === true) {
-            this.serverIp = null;
+            this.serverName = null;
         }
-        // this.ws = new WebSocket(`ws://${this.getServerIp()}`);
+
         const uuid = localStorage.getItem('uuid') ?? null;
         const playerName = localStorage.getItem('playerName') ?? prompt('Enter your name: ');
         localStorage.setItem('playerName', playerName);
+
         this.ws = new WebSocket(Config.address + `?uuid=${uuid}?playerName=${playerName}`);
         this.ws.onerror = event => {
             this.addObject(new Alert(`could not connect to server`, Alert.TYPE_ERROR, this));
@@ -111,13 +112,14 @@ export class Engine {
             this.client = null;
             this.roomInfo.text = `Press P to connect to server`;
             this.serverInfo.text = `Server: unavailable`
-            localStorage.removeItem('serverIp');
+            localStorage.removeItem('serverName');
         }
 
         this.ws.onopen = event => {
             this.addObject(new Alert(`Connected to server!`, Alert.TYPE_SUCCESS, this));
-            localStorage.setItem('serverIp', this.serverIp);
-            this.serverInfo.text = `Server: ${this.serverIp}`
+            this.serverName = Config.address;
+            localStorage.setItem('serverName', this.serverName);
+            this.serverInfo.text = `Server: ${this.serverName}`
 
             this.roomInfo.text = `Press L to join or create a room!`;
         }
@@ -127,8 +129,8 @@ export class Engine {
             this.room = null;
             this.client = null;
             this.roomInfo.text = `Press P to connect to server`;
-            this.serverInfo.text = `Server: unavailable, connection closed`
-            localStorage.removeItem('serverIp');
+            this.serverInfo.text = `Server: not connected`
+            localStorage.removeItem('serverName');
 
         }
 
@@ -138,10 +140,14 @@ export class Engine {
             switch (message.type) {
                 case SocketMessage.TYPE_GAME_READY:
                     this.gameState = GameState.READY_TO_START;
+                    this.gameStateInfo.update(`Game state: ${this.gameState}, press Enter to begin`);
+
+                    console.log('game ready', this.gameState);
 
                     break;
                 case SocketMessage.TYPE_GAME_START:
                     this.gameState = GameState.PLAYING;
+                    this.gameStateInfo.update(`Game state: ${this.gameState}`);
 
                     this.grids.forEach(grid => {
                         grid.addPill();
@@ -218,6 +224,7 @@ export class Engine {
                     break;
                 case SocketMessage.TYPE_GAME_OVER:
                     this.gameState = GameState.READY_TO_START;
+                    this.gameStateInfo.update(`Game state: ${this.gameState}, press Enter to play again`);
 
                     this.grids.forEach(grid => {
                         grid.restart();
@@ -226,7 +233,6 @@ export class Engine {
                     this.addObject(new Alert('GAME OVER', Alert.TYPE_INFO, this));
 
                     this.roomInfo.text = `Press L to join or create a room!`;
-                    this.roomInfo.xd = `Press xd to join or create a room!`;
 
                     this.removeObject(this.playerInfo[0].id);
                     this.removeObject(this.playerInfo[1].id);
@@ -237,6 +243,19 @@ export class Engine {
             }
         }
     }
+
+    startGame() {
+        if (this.gameState !== GameState.READY_TO_START) {
+            return;
+        }
+
+        this.gameState = GameState.PLAYING;
+        this.gameStateInfo.update(`Game state: ${this.gameState}`);
+
+        this.ws.send(SocketMessage.send(SocketMessage.TYPE_GAME_START, {client: this.client}, this.client));
+
+    }
+
     generateUuid() {
         return 'xxxxxxxx'.replace(/[xy]/g, function(c) {
             let r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
